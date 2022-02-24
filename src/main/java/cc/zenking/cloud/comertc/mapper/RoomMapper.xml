@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cc.zenking.cloud.comertc.mapper.RoomMapper">
+	
+	<select id="getRoom" resultType="room">
+	select * from rtc_room where flag <![CDATA[<>]]> -1 
+	<if test="userId != null"> and user_id = #{userId}</if>
+	<if test="roomCode != null"> and room_code = #{roomCode}</if>
+	limit 1
+	</select>
+	
+	<select id="selectRooms" resultType="room">
+	select * from rtc_room where flag <![CDATA[<>]]> -1 limit 1
+	</select>
+	
+</mapper>

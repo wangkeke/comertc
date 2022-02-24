@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+	<title>视频会议</title>
+
+	<meta name="viewport" content="width=device-width, initial-scale=1" charset="utf-8"></meta>
+	<link rel="shortcut icon" href="images/favicon.ico" type="image/x-icon"></link>
+
+	<!-- Bootstrap -->
+	<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"></link>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"></link>
+	<!-- Bootstrap -->
+
+	<script src="/openvidu-browser-2.20.0.js"></script>
+</head>
+<body class="container">
+<nav class="navbar navbar-default">
+  <div class="container-fluid">
+    <!-- Brand and toggle get grouped for better mobile display -->
+    <div class="navbar-header">
+      <a class="navbar-brand" href="/">直播平台</a>
+    </div>
+    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-5">
+      <ul class="nav navbar-nav">
+        <li class="active"><a href="#">视频会议 <span class="sr-only">(current)</span></a></li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li th:if="${session.user == null}"><a href="/user/prelogin">登录</a></li>
+        <li th:if="${session.user != null}" ><a href="#" th:text="${session.user.nickname}"></a></li>
+        <li th:if="${session.user != null}"><a th:href="@{/user/logout}">退出</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div  class="container">
+	<div class="row">
+	<div class="btn-group" role="group" aria-label="...">
+	  <a role="button" href="/meet/addView" class="btn btn-success">创建视频会议</a>
+	</div>
+	</div>
+	<div class="row">
+		<table class="table">
+		<caption>视频会议列表</caption>
+		<thead>
+		<tr>
+		<th>会议ID</th>
+		<th>会议名称</th>
+		<th>开始时间</th>
+		<th>会议状态</th>
+		</tr>
+		</thead>
+		<tbody>
+		<tr th:each="meet : ${meets}">
+		<td th:text="${meet.id}"/>
+		<td th:text="${meet.meetName}"/>
+		<td th:text="${#dates.format(meet.beginTime, 'yyyy-MM-dd HH:mm')}"/>
+		<td><a class="btn btn-info btn-xs" href="meet.html" 
+		   th:href="@{/meet/join(meetCode=${meet.meetCode})}">加入会议</a></td>
+		</tr>
+		</tbody>
+		</table>
+	</div>
+</div>
+</body>
+</html>

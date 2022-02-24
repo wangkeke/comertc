@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+	<title>直播间</title>
+
+	<meta name="viewport" content="width=device-width, initial-scale=1" charset="utf-8"></meta>
+	<link rel="shortcut icon" href="images/favicon.ico" type="image/x-icon"></link>
+
+	<!-- Bootstrap -->
+	<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"></link>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"></link>
+	<!-- Bootstrap -->
+
+	<script src="/openvidu-browser-2.20.0.js"></script>
+</head>
+<body class="container">
+<nav class="navbar navbar-default">
+  <div class="container-fluid">
+    <!-- Brand and toggle get grouped for better mobile display -->
+    <div class="navbar-header">
+      <a class="navbar-brand" href="/">直播平台</a>
+    </div>
+    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-5">
+      <ul class="nav navbar-nav">
+        <li><a th:href="@{/meet/list}">视频会议</a></li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li th:if="${session.user == null}"><a href="/user/prelogin">登录</a></li>
+        <li th:if="${session.user != null}" ><a href="#" th:text="${session.user.nickname}"></a></li>
+        <li th:if="${session.user != null}"><a th:href="@{/user/logout}">退出</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div  class="container">
+	<div class="row">
+	  <div class="col-xs-12 col-md-8">
+		<div class="panel panel-default">
+		  <div class="panel-heading" th:text="${room.roomName}">...</div>
+		  <div class="panel-body" style="position: relative ;z-index:1000;height: 400px">
+		  	<video controls muted id="video-container" src="" width="100%" height="100%"></video>
+		  </div>
+		  <div class="panel-footer">
+		  	<button type="button" class="btn btn-primary btn-xs" onclick="toggleAudio()">关闭/打开声音</button>
+  			<button type="button" class="btn btn-default btn-xs" onclick="toggleVideo()">关闭/打开视频</button>
+		  </div>
+		</div>
+	  </div>
+	  <div class="col-xs-6 col-md-4">
+	  	<div class="panel panel-default">
+		  <div id="chat-log" style="height: 427px;line-height:27px;overflow: scroll;" class="panel-body">
+		    	
+		  </div>
+		  <div class="panel-footer">
+		  <div class="row">
+			  <div class="col-lg-12">
+			    <div class="input-group">
+			      <input type="text" id="chat-input" class="form-control" placeholder="请输入聊天信息...">
+			      <span class="input-group-btn">
+			        <button class="btn btn-default" onclick="sendMessage()" type="button">发送</button>
+			      </span>
+			    </div><!-- /input-group -->
+			  </div><!-- /.col-lg-6 -->
+			</div><!-- /.row -->
+		  </div>
+		</div>
+	  </div>
+	</div>
+</div>
+
+<script th:inline="javascript">
+var user = /*[[${session.user}]]*/ null;
+var room = /*[[${room}]]*/ null;
+var connectionId = /*[[${connectionId}]]*/ null;
+var token = /*[[${token}]]*/ null;
+
+// --- 1) Get an OpenVidu object ---
+
+var OV = new OpenVidu();
+
+console.log( OV.checkScreenSharingCapabilities());
+
+console.log( OV.checkSystemRequirements());
+
+var devices = OV.getDevices();
+
+$.each(devices, function(i,val){
+	window.alert(devices.length);
+	$("#live-controls").append('<button type="button" class="btn btn-primary btn-xs">' + val.deviceId + '</button>');
+});
+
+// --- 2) Init a session ---
+
+var session = OV.initSession();
+session.connect(token)
+		.then(() => {
+			console.log("session connect Successfully");
+		})
+		.catch(error => {console.error("session connect error" ,error)});
+
+var subscriber;
+session.on('streamCreated' , (event) => {
+	subscriber = session.subscribe(event.stream , undefined);
+	console.log("user data : ",event.stream.connection.data);
+	var videoDOM = document.getElementById('video-container');
+	subscriber.addVideoElement(videoDOM);
+	$(videoDOM).prop('muted', false);
+	$(videoDOM).prop('controls', true);
+	$(videoDOM).prop('autoplay', 'autoplay');
+});
+
+//Receiver of the message (usually before calling 'session.connect')
+session.on('signal:broadcast', (event) => {
+    console.log(event.type , event.from , event.data);
+    $("#chat-log").append("<p>" + event.data + "</p>");
+});
+
+session.on('connectionCreated' , (event) => {
+	console.log('connectionCreated',event);
+});
+
+session.on('connectionDestroyed' , (event) => {
+	console.log('connectionDestroyed',event);
+});
+
+session.on('sessionDisconnected' , (event) => {
+	console.log('sessionDisconnected',event);
+});
+
+session.on('streamPropertyChanged' , (event) => {
+	console.log('sessionDisconnected',event);
+});
+
+session.on('streamDestroyed' , (event) => {
+	console.log('sessionDisconnected',event);
+});
+
+session.on('networkQualityLevelChanged' , (event) => {
+	console.log('sessionDisconnected',event);
+});
+
+//On every asynchronous exception...
+session.on('exception', (exception) => {
+	console.warn(exception);
+});
+
+var audioEnabled = false;
+function toggleAudio(){
+	audioEnabled = !audioEnabled;
+	subscriber.subscribeToAudio(audioEnabled); // true to unmute the audio track, false to mute it
+}
+
+var videoEnabled = true;
+function toggleVideo(){
+	videoEnabled = !videoEnabled;
+	subscriber.subscribeToVideo(videoEnabled);
+}
+
+function sendMessage(){
+	var text = $("#chat-input").val();
+	if(!text){
+		return;
+	}
+	session.signal({
+	      data: text,  				  // Any string (optional)
+	      to: [],                     // Array of Connection objects (optional. Broadcast to everyone if empty)
+	      type: 'broadcast'             // The type of message (optional)
+	    })
+	    .then(() => {
+	        console.log('Message successfully sent');
+	        $("#chat-input").val(null);
+	    })
+	    .catch(error => {
+	        console.error(error);
+	    });
+}
+
+
+</script>
+
+</body>
+</html>

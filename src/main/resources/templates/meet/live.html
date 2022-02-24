@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+	<title>视频会议</title>
+
+	<meta name="viewport" content="width=device-width, initial-scale=1" charset="utf-8"></meta>
+	<link rel="shortcut icon" href="images/favicon.ico" type="image/x-icon"></link>
+
+	<!-- Bootstrap -->
+	<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"></link>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"></link>
+	<!-- Bootstrap -->
+	<script src="/openvidu-browser-2.20.0.js"></script>
+	<style type="text/css">
+	video{
+		border: 0px;
+		margin: 0px;
+		padding: 0px;
+	}
+	#participant-list{
+		margin: 0 20px;
+	}
+	#participant-list video{
+		display: inline-block;
+		overflow: auto;
+		float: left;
+		width: 275px;
+		height: 350px;
+	}
+	#self-video{
+		display: block;
+		position: absolute;
+		z-index: 10000000;
+		width: 275px;
+		height: 350px;
+		top: 100px;
+		right:20px;
+	}
+	</style>
+</head>
+<body>
+<input type="hidden" id="connectionId" th:value="${connectionId}">
+<header class="navbar navbar-static-top">
+	<div class="container">
+		<nav class="navbar navbar-default">
+		  <div class="container-fluid">
+		    <!-- Brand and toggle get grouped for better mobile display -->
+		    <div class="navbar-header">
+		      <a class="navbar-brand" href="#" th:text="${meet.meetName}">...</a>
+		    </div>
+		    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-5">
+		      <ul class="nav navbar-nav navbar-right">
+		        <li><a href="javascript:shareScreen()" >桌面共享</a></li>
+		        <li><a href="javascript:toggleAudio()">打开/关闭麦克风</a></li>
+		        <li><a href="javascript:toggleVideo()" >打开/关闭摄像头</a></li>
+		        <li class="dropdown">
+		          <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="toggleCamera" role="button" aria-haspopup="true" aria-expanded="false">切换摄像头 <span class="caret"></span></a>
+		          <ul class="dropdown-menu">
+		            <!-- <li><a href="#">Action</a></li> -->
+		          </ul>
+		        </li>
+		        <li><a href="javascript:leaveMeet()">退出会议</a></li>
+		      </ul>
+		    </div>
+		  </div>
+		</nav>
+	</div>
+</header>
+<div class="container" style="position: relative;">
+	<div class="row" id="participant-list">
+	
+	</div>
+</div>
+<video id="self-video" muted="muted"></video>
+<script th:inline="javascript">
+
+var user = /*[[${session.user}]]*/ null;
+var meet = /*[[${meet}]]*/ null;
+var connectionId = /*[[${connectionId}]]*/ null;
+var token = /*[[${token}]]*/ null;
+var metadata;
+if(user){
+	metadata = {userName: user.username , nickName: user.nickname};
+}
+
+// --- 1) Get an OpenVidu object ---
+
+var OV = new OpenVidu();
+
+console.log( OV.checkScreenSharingCapabilities());
+
+console.log( OV.checkSystemRequirements());
+
+var videoinputs = [];
+var audioinputs = [];
+var currentCamera;
+var publisher;
+var publishProperties;
+var session;
+OV.getDevices().then(devices => {
+	devices.forEach(function(item){		
+		if(item.kind == 'videoinput' && item.label.indexOf('Virtual')<0){
+			videoinputs.push(item);
+		}else if(item.kind == 'audioinput' && !item.label.indexOf('Virtual')<0){
+			audioinputs.push(item);
+		}
+	});
+	
+	$.each(videoinputs , function(index , value){
+		currentCamera = value.deviceId;
+		$("#toggleCamera ul").append(function(){
+			return '<li><a href="#" onclick="toggleCamera(' + index + ')">' + value.deviceId + '</a></li>'
+		});
+	});
+	
+	publishProperties = {
+		    audioSource: (audioinputs.length==0?false:undefined), // The source of audio. If undefined default audio input
+		    videoSource: (videoinputs.length==0?false:currentCamera), // The source of video. If undefined default video input
+		    publishAudio: true,     // Whether you want to start the publishing with audio unmuted or muted
+		    publishVideo: true,     // Whether you want to start the publishing with video enabled or disabled
+		    resolution: '640x480',  // The resolution of your video
+		    frameRate: 30,          // The frame rate of your video
+		    insertMode: 'REPLACE',   // How the video will be inserted according to targetElement
+		    mirror: false           // Whether to mirror your local video or not
+		};
+	// --- 2) Init a session ---
+	session = OV.initSession();
+	session.connect(token)
+		.then(() => {
+			console.log("session connect Successfully" , session);
+			if(videoinputs.length>0 || audioinputs.length>0){			
+				publish();
+			}
+		})
+		.catch(error => {console.error("session connect error" ,error)});
+
+	session.on('connectionCreated' , (event) => {
+		console.log('connectionCreated',event);
+	});
+
+	session.on('connectionDestroyed' , (event) => {
+		console.log('connectionDestroyed',event);
+	});
+
+	session.on('sessionDisconnected' , (event) => {
+		console.log('sessionDisconnected',event);
+	});
+
+	session.on('streamCreated' , (event) => {
+		console.log("user data : ",event.stream.connection.data);
+		session.subscribe(event.stream , "participant-list");
+	});
+
+	session.on('streamPropertyChanged' , (event) => {
+		console.log('sessionDisconnected',event);
+	});
+
+	session.on('streamDestroyed' , (event) => {
+		console.log('sessionDisconnected',event);
+	});
+	
+	session.on('reconnecting', () => console.warn('Trying to reconnect to the session'));
+	session.on('reconnected', () => console.log('You successfully reconnected to the session'));
+	session.on('sessionDisconnected', (event) => {
+	    if (event.reason === 'networkDisconnect') {
+	        window.alert("您已于会议断开连接，请重新进入会议！");
+	    	console.warn('您已于会议断开连接，请重新进入会议！');
+	    } else {
+	        // Disconnected from the session for other reason than a network drop
+	    }
+	});
+	
+	//Receiver of the message (usually before calling 'session.connect')
+	session.on('signal:sharescreen-ended', (event) => {
+		window.alert(event.data);
+		console.log(event.type , event.from , event.data);
+	    $("#remote-video-" + event.data).remove();
+	});
+	
+	//On every asynchronous exception...
+	session.on('exception', (exception) => {
+		console.warn(exception);
+	});
+	
+});
+
+var audioEnabled = false;
+function toggleAudio(){
+	audioEnabled = !audioEnabled;
+	if(publisher){		
+		publisher.publishAudio(audioEnabled); // true to unmute the audio track, false to mute it
+	}
+}
+
+var videoEnabled = true;
+function toggleVideo(){
+	videoEnabled = !videoEnabled;
+	if(publisher){		
+		publisher.publishVideo(videoEnabled);
+	}
+}
+
+var shareScreenEnabled = false;
+function shareScreen(){
+	shareScreenEnabled = !shareScreenEnabled;
+	if(shareScreenEnabled){
+		publishProperties.videoSource = "screen";
+	}else{
+		publishProperties.videoSource = videoinputs.length==0?false:currentCamera;
+	}
+	if(publisher){		
+		session.unpublish(publisher).then(() => {
+			console.log("cancel old publish");
+			publisher = undefined;
+			publish();
+		});
+	}else{
+		publish();
+	}
+}
+
+function leaveMeet(){
+	window.location.href = "/meet/leave?meetCode=" + meet.meetCode + "&connectionId=" + $("#connectionId").val();
+}
+
+function toggleCamera(index) {
+	currentCamera = videoDevices[index].deviceId;
+	publishProperties.videoSource = currentCamera;
+	session.unpublish(publisher).then(() => {
+		console.log("cancel old publish");
+		publish();
+	});
+}
+
+function publish(){
+	if(publishProperties.videoSource!="screen" && videoinputs.length==0 && audioinputs.length==0){
+		publisher = undefined;
+		return;
+	}
+	publisher = OV.initPublisher(undefined, publishProperties);
+	var videoDOM = document.getElementById("self-video");
+	publisher.addVideoElement(videoDOM);
+	$(videoDOM).prop('muted', true);
+	$(videoDOM).prop('controls', false);
+	$(videoDOM).prop('autoplay', 'autoplay');
+	session.publish(publisher);
+	if(publishProperties.videoSource == "screen"){		
+		publisher.once('accessAllowed', (event) => {
+	        publisher.stream.getMediaStream().getVideoTracks()[0].addEventListener('ended', () => {
+	        	console.log('User pressed the "Stop sharing" button');
+	        	session.signal({
+	      	      data: publisher.stream.streamId,  				  // Any string (optional)
+	      	      to: [],                     // Array of Connection objects (optional. Broadcast to everyone if empty)
+	      	      type: 'sharescreen-ended'             // The type of message (optional)
+	      	    })
+	      	    .then(() => {
+	      	        console.log('Message successfully sent');
+		        	publishProperties.videoSource = currentCamera;
+		    		publish();
+	      	    })
+	      	    .catch(error => {
+	      	        console.error(error);
+	      	    });
+	        });
+	    });
+
+	    publisher.once('accessDenied', (event) => {
+	        console.warn('ScreenShare: Access Denied');
+			publishProperties.videoSource = currentCamera;
+			publish();
+	    });
+	}
+}
+
+</script>
+
+</body>
+</html>

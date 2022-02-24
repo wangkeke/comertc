@@ -1,0 +1,28 @@
+server: 
+  port: 8080
+  ssl: 
+    enabled: true
+    key-store: classpath:openvidu-selfsigned.jks
+    key-store-password: openvidu
+    key-store-type: JKS
+    key-alias: openvidu-selfsigned
+
+spring: 
+  application: 
+    name: comertc
+  datasource:
+    url: jdbc:mysql://192.168.9.34:3306/comertc?serverTimezone=GMT%2B8&useUnicode=true&characterEncoding=utf8&useSSL=false&verifyServerCertificate=false
+    username: root
+    password: 12345678
+    driver-class-name: com.mysql.jdbc.Driver
+
+mybatis: 
+  config-location: classpath:mybatis-config.xml
+
+logging: 
+  level: 
+    cc.zenking.cloud.comertc.mapper: DEBUG
+
+openvidu: 
+  hostname: http://222.186.141.230:5443/
+  secret: develop

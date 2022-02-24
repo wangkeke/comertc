@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+	<title>直播间-发布直播</title>
+
+	<meta name="viewport" content="width=device-width, initial-scale=1" charset="utf-8"></meta>
+	<link rel="shortcut icon" href="images/favicon.ico" type="image/x-icon"></link>
+
+	<!-- Bootstrap -->
+	<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"></link>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"></link>
+	<!-- Bootstrap -->
+
+	<script src="/openvidu-browser-2.20.0.js"></script>
+</head>
+<body class="container">
+<nav class="navbar navbar-default">
+  <div class="container-fluid">
+    <!-- Brand and toggle get grouped for better mobile display -->
+    <div class="navbar-header">
+      <a class="navbar-brand" href="/">直播平台</a>
+    </div>
+    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-5">
+	  <ul class="nav navbar-nav">
+        <li><a th:href="@{/meet/list}">视频会议</a></li>
+      </ul>
+      
+      <ul class="nav navbar-nav navbar-right">
+        <li th:if="${session.user == null}"><a href="/user/prelogin">登录</a></li>
+        <li th:if="${session.user != null}" ><a href="#" th:text="${session.user.nickname}"></a></li>
+        <li th:if="${session.user != null}" ><a th:href="@{/room/end(roomCode=${room.roomCode})}">结束直播</a></li>
+        <li th:if="${session.user != null}"><a th:href="@{/user/logout}">退出</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div  class="container">
+	<div class="row">
+	  <div class="col-xs-12 col-md-8">
+		<div class="panel panel-default">
+		  <div class="panel-heading" th:text="${room.roomName}">...</div>
+		  <div class="panel-body" style="height: 400px">
+		  	<video controls muted id="video-container" src="" width="100%" height="100%"></video>
+		  </div>
+		  <div class="panel-footer" id="live-controls">
+		  	<button type="button" class="btn btn-primary btn-xs" onclick="toggleAudio()">关闭/打开声音</button>
+  			<button type="button" class="btn btn-default btn-xs" onclick="toggleVideo()">关闭/打开视频</button>
+  			<button type="button" class="btn btn-primary btn-xs" onclick="publish()">开始直播</button>
+  			<button type="button" class="btn btn-primary btn-xs" onclick="unpublish()">停止直播</button>
+  			<button type="button" class="btn btn-primary btn-xs" onclick="toggleCamera_1()">切换摄像头方法一</button>
+  			<button type="button" class="btn btn-primary btn-xs" onclick="toggleCamera_2()">切换摄像头方法二</button>
+		  </div>
+		</div>
+	  </div>
+	  <div class="col-xs-6 col-md-4">
+	  	<div class="panel panel-default">
+		  <div id="chat-log" style="height: 427px;line-height:27px;overflow: scroll;" class="panel-body">
+		    	
+		  </div>
+		  <div class="panel-footer">
+		  <div class="row">
+			  <div class="col-lg-12">
+			    <div class="input-group">
+			      <input type="text" id="chat-input" class="form-control" placeholder="请输入聊天信息...">
+			      <span class="input-group-btn">
+			        <button class="btn btn-default" onclick="sendMessage()" type="button">发送</button>
+			      </span>
+			    </div><!-- /input-group -->
+			  </div><!-- /.col-lg-6 -->
+			</div><!-- /.row -->
+		  </div>
+		</div>
+	  </div>
+	</div>
+</div>
+
+<script th:inline="javascript">
+var user = /*[[${session.user}]]*/ null;
+var room = /*[[${room}]]*/ null;
+var connectionId = /*[[${connectionId}]]*/ null;
+var token = /*[[${token}]]*/ null;
+
+// --- 1) Get an OpenVidu object ---
+
+var OV = new OpenVidu();
+
+console.log( OV.checkScreenSharingCapabilities());
+
+console.log( OV.checkSystemRequirements());
+
+var deviceArray = [];
+OV.getDevices().then(devices => {
+	devices.forEach(function(item){		
+		if(item.kind == 'videoinput'){
+			deviceArray.push(item);
+		}
+	});
+});
+
+// --- 2) Init a session ---
+
+var session = OV.initSession();
+var publisher;
+session.connect(token)
+	.then(() => {
+		console.log("session connect Successfully");
+		publish();
+	})
+	.catch(error => {console.error("session connect error" ,error)});
+
+var publishProperties = {
+    audioSource: undefined, // The source of audio. If undefined default audio input
+    videoSource: undefined, // The source of video. If undefined default video input
+    publishAudio: true,     // Whether you want to start the publishing with audio unmuted or muted
+    publishVideo: true,     // Whether you want to start the publishing with video enabled or disabled
+    resolution: '640x480',  // The resolution of your video
+    frameRate: 30,          // The frame rate of your video
+    insertMode: 'REPLACE',   // How the video will be inserted according to targetElement
+    mirror: false           // Whether to mirror your local video or not
+}
+
+//Receiver of the message (usually before calling 'session.connect')
+session.on('signal:broadcast', (event) => {
+    console.log(event.type , event.from , event.data); // Message
+    $("#chat-log").append("<p>" + event.data + "</p>");
+});
+
+session.on('connectionCreated' , (event) => {
+	console.log('connectionCreated',event);
+});
+
+session.on('connectionDestroyed' , (event) => {
+	console.log('connectionDestroyed',event);
+});
+
+session.on('sessionDisconnected' , (event) => {
+	console.log('sessionDisconnected',event);
+});
+
+session.on('streamPropertyChanged' , (event) => {
+	console.log('sessionDisconnected',event);
+});
+
+session.on('streamDestroyed' , (event) => {
+	console.log('sessionDisconnected',event);
+});
+
+session.on('networkQualityLevelChanged' , (event) => {
+	console.log('sessionDisconnected',event);
+});
+
+//On every asynchronous exception...
+session.on('exception', (exception) => {
+	console.warn(exception);
+});
+
+function publish(){
+	publisher = OV.initPublisher(undefined, publishProperties);
+	var videoDOM = document.getElementById("video-container");
+	publisher.addVideoElement(videoDOM);
+	$(videoDOM).prop('muted', true);
+	$(videoDOM).prop('controls', true);
+	$(videoDOM).prop('autoplay', 'autoplay');
+	session.publish(publisher);
+}
+
+function unpublish(){
+	if(publisher){		
+	session.unpublish(publisher);
+	publisher = undefined;
+	}
+}
+
+function leaveSession(){
+	session.disconnect();
+}
+
+var audioEnabled = false;
+function toggleAudio(){
+	audioEnabled = !audioEnabled;
+	publisher.publishAudio(audioEnabled); // true to unmute the audio track, false to mute it
+}
+
+var videoEnabled = true;
+function toggleVideo(){
+	videoEnabled = !videoEnabled;
+	publisher.publishVideo(videoEnabled);
+}
+
+function sendMessage(){
+	var text = $("#chat-input").val();
+	if(!text){
+		return;
+	}
+	session.signal({
+	      data: text,  				  // Any string (optional)
+	      to: [],                     // Array of Connection objects (optional. Broadcast to everyone if empty)
+	      type: 'broadcast'             // The type of message (optional)
+	    })
+	    .then(() => {
+	        console.log('Message successfully sent');
+	        $("#chat-input").val(null);
+	    })
+	    .catch(error => {
+	        console.error(error);
+	    });
+}
+
+var isFrontCamera = true;
+function toggleCamera_1(){
+	isFrontCamera = !isFrontCamera;
+	publishProperties.videoSource = isFrontCamera?deviceArray[1].deviceId:deviceArray[0].deviceId;
+	OV.getUserMedia(publishProperties).then(mediaStream => {
+		// Replacing video track
+		publisher.replaceTrack(mediaStream.getVideoTracks()[0])
+		    .then(() => console.log('New track has been published'))
+		    .catch(error => console.error('Error replacing track', error));
+	});
+}
+
+function toggleCamera_2() {
+	if(deviceArray.length<2){
+		return;
+	}
+	isFrontCamera = !isFrontCamera;
+	publishProperties.videoSource = isFrontCamera?deviceArray[1].deviceId:deviceArray[0].deviceId;
+	session.unpublish(publisher).then(() => {
+		console.log("cancel old publish");
+		publish();
+	})
+}
+
+</script>
+
+</body>
+</html>

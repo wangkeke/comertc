@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cc.zenking.cloud.comertc.mapper.MeetMapper">
+	
+	<select id="selectMeets" resultType="meet">
+	select * from rtc_meet where flag <![CDATA[<>]]> -1  
+	<if test="value != null"> and creator_uid = #{value}</if>
+	</select>
+	
+	<select id="getMeet" resultType="meet">
+	select * from rtc_meet where flag <![CDATA[<>]]> -1 and 
+	meet_code = #{value} limit 1
+	</select>
+	
+	<insert id="insertMeet" keyColumn="id" keyProperty="id" parameterType="meet">
+	insert into rtc_meet (`meet_name`,`begin_time`,`end_time`,`meet_code`,`meet_pwd`,`creator_uid`,`status`,`flag`,`create_time`) 
+	values 
+	(#{meetName},#{beginTime},#{endTime},#{meetCode},#{meetPwd},#{creatorUid},#{status},0,#{createTime})
+	</insert>
+	
+	<update id="updateMeetStatusByCode">
+	update rtc_meet set `status` = #{status} where meet_code = #{meetCode}
+	</update>
+	
+</mapper>

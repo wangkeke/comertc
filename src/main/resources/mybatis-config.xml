@@ -1,0 +1,18 @@
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+	<settings>
+	  <setting name="defaultFetchSize" value="100"/>
+	  <setting name="mapUnderscoreToCamelCase" value="true"/>
+	  <setting name="jdbcTypeForNull" value="NULL"/>
+	  <setting name="useGeneratedKeys" value="true"/>
+	</settings>
+    <typeAliases>
+        <package name="cc.zenking.cloud.comertc.domain"/>
+        <package name="cc.zenking.cloud.comertc.vo"/>
+    </typeAliases>
+    <mappers>
+    	<package name="cc.zenking.cloud.comertc.mapper"/>
+    </mappers>
+</configuration>
