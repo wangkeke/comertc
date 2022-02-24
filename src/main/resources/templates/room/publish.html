@@ -52,6 +52,7 @@
   			<button type="button" class="btn btn-primary btn-xs" onclick="unpublish()">停止直播</button>
   			<button type="button" class="btn btn-primary btn-xs" onclick="toggleCamera_1()">切换摄像头方法一</button>
   			<button type="button" class="btn btn-primary btn-xs" onclick="toggleCamera_2()">切换摄像头方法二</button>
+  			<button type="button" class="btn btn-primary btn-xs" onclick="shareScreen()">共享屏幕</button>
 		  </div>
 		</div>
 	  </div>
@@ -83,81 +84,98 @@ var room = /*[[${room}]]*/ null;
 var connectionId = /*[[${connectionId}]]*/ null;
 var token = /*[[${token}]]*/ null;
 
-// --- 1) Get an OpenVidu object ---
+//var platform = PlatformUtils.getInstance();
 
+//if(!platform.isChromeBrowser()){
+//	window.alert("直播功能仅支持Google Chrome浏览器！");
+//}
+
+//--- 1) Get an OpenVidu object ---
 var OV = new OpenVidu();
 
 console.log( OV.checkScreenSharingCapabilities());
 
 console.log( OV.checkSystemRequirements());
 
-var deviceArray = [];
+var videoinputs = [];
+var audioinputs = [];
+var currentCamera;
+var publisher;
+var publishProperties;
+var session;
 OV.getDevices().then(devices => {
 	devices.forEach(function(item){		
-		if(item.kind == 'videoinput'){
-			deviceArray.push(item);
+		if(item.kind == 'videoinput' && item.label.indexOf('Virtual')<0){
+			videoinputs.push(item);
+		}else if(item.kind == 'audioinput' && item.label.indexOf('Virtual')<0){
+			audioinputs.push(item);
 		}
 	});
-});
+	
+	publishProperties = {
+		    audioSource: (audioinputs.length==0?false:undefined), // The source of audio. If undefined default audio input
+		    videoSource: (videoinputs.length==0?false:currentCamera), // The source of video. If undefined default video input
+		    publishAudio: true,     // Whether you want to start the publishing with audio unmuted or muted
+		    publishVideo: true,     // Whether you want to start the publishing with video enabled or disabled
+		    resolution: '640x480',  // The resolution of your video
+		    frameRate: 30,          // The frame rate of your video
+		    insertMode: 'REPLACE',   // How the video will be inserted according to targetElement
+		    mirror: false           // Whether to mirror your local video or not
+		};
+	
+	session = OV.initSession();
+	session.connect(token)
+		.then(() => {
+			console.log("session connect Successfully");
+			publish();
+		})
+		.catch(error => {console.error("session connect error" ,error)});
 
+	//Receiver of the message (usually before calling 'session.connect')
+	session.on('signal:broadcast', (event) => {
+	    console.log(event.type , event.from , event.data); // Message
+	    $("#chat-log").append("<p>" + event.data + "</p>");
+	});
+
+	session.on('connectionCreated' , (event) => {
+		console.log('connectionCreated',event);
+	});
+
+	session.on('connectionDestroyed' , (event) => {
+		console.log('connectionDestroyed',event);
+	});
+
+	session.on('sessionDisconnected' , (event) => {
+		console.log('sessionDisconnected',event);
+	});
+
+	session.on('streamPropertyChanged' , (event) => {
+		console.log('sessionDisconnected',event);
+	});
+
+	session.on('streamDestroyed' , (event) => {
+		console.log('sessionDisconnected',event);
+	});
+
+	session.on('networkQualityLevelChanged' , (event) => {
+		console.log('sessionDisconnected',event);
+	});
+
+	//On every asynchronous exception...
+	session.on('exception', (exception) => {
+		console.warn(exception);
+	});
+
+});
 // --- 2) Init a session ---
 
-var session = OV.initSession();
-var publisher;
-session.connect(token)
-	.then(() => {
-		console.log("session connect Successfully");
-		publish();
-	})
-	.catch(error => {console.error("session connect error" ,error)});
 
-var publishProperties = {
-    audioSource: undefined, // The source of audio. If undefined default audio input
-    videoSource: undefined, // The source of video. If undefined default video input
-    publishAudio: true,     // Whether you want to start the publishing with audio unmuted or muted
-    publishVideo: true,     // Whether you want to start the publishing with video enabled or disabled
-    resolution: '640x480',  // The resolution of your video
-    frameRate: 30,          // The frame rate of your video
-    insertMode: 'REPLACE',   // How the video will be inserted according to targetElement
-    mirror: false           // Whether to mirror your local video or not
-}
-
-//Receiver of the message (usually before calling 'session.connect')
-session.on('signal:broadcast', (event) => {
-    console.log(event.type , event.from , event.data); // Message
-    $("#chat-log").append("<p>" + event.data + "</p>");
-});
-
-session.on('connectionCreated' , (event) => {
-	console.log('connectionCreated',event);
-});
-
-session.on('connectionDestroyed' , (event) => {
-	console.log('connectionDestroyed',event);
-});
-
-session.on('sessionDisconnected' , (event) => {
-	console.log('sessionDisconnected',event);
-});
-
-session.on('streamPropertyChanged' , (event) => {
-	console.log('sessionDisconnected',event);
-});
-
-session.on('streamDestroyed' , (event) => {
-	console.log('sessionDisconnected',event);
-});
-
-session.on('networkQualityLevelChanged' , (event) => {
-	console.log('sessionDisconnected',event);
-});
-
-//On every asynchronous exception...
-session.on('exception', (exception) => {
-	console.warn(exception);
-});
 
 function publish(){
+	if(publishProperties.videoSource!="screen" && videoinputs.length==0 && audioinputs.length==0){
+		publisher = undefined;
+		return;
+	}
 	publisher = OV.initPublisher(undefined, publishProperties);
 	var videoDOM = document.getElementById("video-container");
 	publisher.addVideoElement(videoDOM);
@@ -165,6 +183,32 @@ function publish(){
 	$(videoDOM).prop('controls', true);
 	$(videoDOM).prop('autoplay', 'autoplay');
 	session.publish(publisher);
+	if(publishProperties.videoSource == "screen"){		
+		publisher.once('accessAllowed', (event) => {
+	        publisher.stream.getMediaStream().getVideoTracks()[0].addEventListener('ended', () => {
+	        	console.log('User pressed the "Stop sharing" button');
+	        	session.signal({
+	      	      data: publisher.stream.streamId,  				  // Any string (optional)
+	      	      to: [],                     // Array of Connection objects (optional. Broadcast to everyone if empty)
+	      	      type: 'sharescreen-ended'             // The type of message (optional)
+	      	    })
+	      	    .then(() => {
+	      	        console.log('Message successfully sent');
+		        	publishProperties.videoSource = currentCamera;
+		    		publish();
+	      	    })
+	      	    .catch(error => {
+	      	        console.error(error);
+	      	    });
+	        });
+	    });
+
+	    publisher.once('accessDenied', (event) => {
+	        console.warn('ScreenShare: Access Denied');
+			publishProperties.videoSource = currentCamera;
+			publish();
+	    });
+	}
 }
 
 function unpublish(){
@@ -231,6 +275,25 @@ function toggleCamera_2() {
 		console.log("cancel old publish");
 		publish();
 	})
+}
+
+var shareScreenEnabled = false;
+function shareScreen(){
+	shareScreenEnabled = !shareScreenEnabled;
+	if(shareScreenEnabled){
+		publishProperties.videoSource = "screen";
+	}else{
+		publishProperties.videoSource = currentCamera;
+	}
+	if(publisher){		
+		session.unpublish(publisher).then(() => {
+			console.log("cancel old publish");
+			publisher = undefined;
+			publish();
+		});
+	}else{
+		publish();
+	}
 }
 
 </script>

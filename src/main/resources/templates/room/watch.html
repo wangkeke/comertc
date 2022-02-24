@@ -118,6 +118,11 @@ session.on('signal:broadcast', (event) => {
     $("#chat-log").append("<p>" + event.data + "</p>");
 });
 
+session:on('signal:sharescreen-ended' , (event) => {
+	console.log("屏幕共享关闭" , event.type , event.from , event.data);
+	$("#video-container").attr("src","");
+});
+
 session.on('connectionCreated' , (event) => {
 	console.log('connectionCreated',event);
 });

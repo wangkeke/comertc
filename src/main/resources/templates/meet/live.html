@@ -85,6 +85,12 @@ if(user){
 	metadata = {userName: user.username , nickName: user.nickname};
 }
 
+// var platform = PlatformUtils.getInstance();
+
+//if(!platform.isChromeBrowser()){
+//	window.alert("直播功能仅支持Google Chrome浏览器！");
+//}
+
 // --- 1) Get an OpenVidu object ---
 
 var OV = new OpenVidu();
@@ -103,7 +109,7 @@ OV.getDevices().then(devices => {
 	devices.forEach(function(item){		
 		if(item.kind == 'videoinput' && item.label.indexOf('Virtual')<0){
 			videoinputs.push(item);
-		}else if(item.kind == 'audioinput' && !item.label.indexOf('Virtual')<0){
+		}else if(item.kind == 'audioinput' && item.label.indexOf('Virtual')<0){
 			audioinputs.push(item);
 		}
 	});
