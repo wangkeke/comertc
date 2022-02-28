@@ -49,7 +49,7 @@ public class MeetController {
 		}
 		List<Meet> meets = service.list();
 		model.addAttribute("meets", meets);
-		return "/meet/list";
+		return "meet/list";
 	}
 	
 	@RequestMapping("join")
@@ -62,7 +62,7 @@ public class MeetController {
 			model.addAttribute("connectionId", vo.getConnectionId());
 			model.addAttribute("token", vo.getToken());
 			model.addAttribute("meet", vo.getExtraData());
-			return "/meet/live";
+			return "meet/live";
 		} catch (Exception e) {
 			model.addAttribute("message", e.getMessage());
 			return "error";
@@ -74,7 +74,7 @@ public class MeetController {
 		if(!checkUserLogged(httpSession)) {
 			return "redirect:/user/prelogin";
 		}
-		return "/meet/add";
+		return "meet/add";
 	}
 	
 	@RequestMapping("add")

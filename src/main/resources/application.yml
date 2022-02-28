@@ -1,17 +1,20 @@
 server: 
-  port: 8080
-  ssl: 
-    enabled: true
-    key-store: classpath:openvidu-selfsigned.jks
-    key-store-password: openvidu
-    key-store-type: JKS
-    key-alias: openvidu-selfsigned
+  port: 5442
+  tomcat: 
+    redirect-context-root: false 
+  forward-headers-strategy: NATIVE
+#  ssl: 
+#    enabled: true
+#    key-store: classpath:openvidu-selfsigned.jks
+#    key-store-password: openvidu
+#    key-store-type: JKS
+#    key-alias: openvidu-selfsigned
 
 spring: 
   application: 
     name: comertc
   datasource:
-    url: jdbc:mysql://192.168.9.34:3306/comertc?serverTimezone=GMT%2B8&useUnicode=true&characterEncoding=utf8&useSSL=false&verifyServerCertificate=false
+    url: jdbc:mysql://222.186.141.230:3306/comertc?serverTimezone=GMT%2B8&useUnicode=true&characterEncoding=utf8&useSSL=false&verifyServerCertificate=false
     username: root
     password: 12345678
     driver-class-name: com.mysql.jdbc.Driver
@@ -24,5 +27,5 @@ logging:
     cc.zenking.cloud.comertc.mapper: DEBUG
 
 openvidu: 
-  hostname: http://222.186.141.230:5443/
-  secret: develop
+  hostname: ${OPENVIDU_URL:http://222.186.141.230:5443}
+  secret: ${OPENVIDU_SECRET:develop}

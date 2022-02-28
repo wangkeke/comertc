@@ -111,7 +111,7 @@ OV.getDevices().then(devices => {
 			audioinputs.push(item);
 		}
 	});
-	
+
 	publishProperties = {
 		    audioSource: (audioinputs.length==0?false:undefined), // The source of audio. If undefined default audio input
 		    videoSource: (videoinputs.length==0?false:currentCamera), // The source of video. If undefined default video input
@@ -255,6 +255,9 @@ function sendMessage(){
 
 var isFrontCamera = true;
 function toggleCamera_1(){
+	if(videoinputs.length<2){
+		return;
+	}
 	isFrontCamera = !isFrontCamera;
 	publishProperties.videoSource = isFrontCamera?deviceArray[1].deviceId:deviceArray[0].deviceId;
 	OV.getUserMedia(publishProperties).then(mediaStream => {
@@ -266,11 +269,11 @@ function toggleCamera_1(){
 }
 
 function toggleCamera_2() {
-	if(deviceArray.length<2){
+	if(videoinputs.length<2){
 		return;
 	}
 	isFrontCamera = !isFrontCamera;
-	publishProperties.videoSource = isFrontCamera?deviceArray[1].deviceId:deviceArray[0].deviceId;
+	publishProperties.videoSource = isFrontCamera?videoinputs[1].deviceId:videoinputs[0].deviceId;
 	session.unpublish(publisher).then(() => {
 		console.log("cancel old publish");
 		publish();

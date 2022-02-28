@@ -85,13 +85,6 @@ console.log( OV.checkScreenSharingCapabilities());
 
 console.log( OV.checkSystemRequirements());
 
-var devices = OV.getDevices();
-
-$.each(devices, function(i,val){
-	window.alert(devices.length);
-	$("#live-controls").append('<button type="button" class="btn btn-primary btn-xs">' + val.deviceId + '</button>');
-});
-
 // --- 2) Init a session ---
 
 var session = OV.initSession();
@@ -118,7 +111,7 @@ session.on('signal:broadcast', (event) => {
     $("#chat-log").append("<p>" + event.data + "</p>");
 });
 
-session:on('signal:sharescreen-ended' , (event) => {
+session.on('signal:sharescreen-ended' , (event) => {
 	console.log("屏幕共享关闭" , event.type , event.from , event.data);
 	$("#video-container").attr("src","");
 });
